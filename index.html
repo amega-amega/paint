@@ -1,0 +1,476 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Пиксельное рисование</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Общие стили */
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #222;
+      color: #fff;
+      box-sizing: border-box;
+    }
+    .centered {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn {
+      padding: 14px 32px;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 8px;
+      background: #4f8cff;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #2563eb;
+    }
+
+    /* Модальное окно */
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #333;
+      padding: 32px 24px;
+      border-radius: 12px;
+      min-width: 320px;
+      box-shadow: 0 4px 32px #000a;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .modal-content label {
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+    .modal-content input[type="number"] {
+      width: 80px;
+      padding: 6px;
+      font-size: 1rem;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: #222;
+      color: #fff;
+      margin-right: 12px;
+    }
+
+    /* Основной интерфейс */
+    .main-layout {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+    .canvas-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #181818;
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+    }
+    #draw-canvas {
+      background: #fff;
+      border: 2px solid #444;
+      box-shadow: 0 2px 16px #0008;
+      cursor: crosshair;
+      image-rendering: pixelated;
+      display: block;
+      max-width: 100%;
+      max-height: 80vh;
+      position: relative;
+      pointer-events: auto;
+    }
+
+    /* Кнопка копирования */
+    .copy-btn {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      z-index: 10;
+      background: #fff;
+      color: #222;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #0004;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover {
+      background: #e0e0e0;
+    }
+
+    /* Панель инструментов */
+    .side-panel {
+      width: 320px;
+      background: #23272f;
+      box-shadow: -2px 0 12px #0006;
+      display: flex;
+      flex-direction: column;
+      padding: 32px 24px 24px 24px;
+      position: relative;
+      transition: transform 0.3s;
+      z-index: 2;
+    }
+    .side-panel.closed {
+      transform: translateX(100%);
+    }
+    .toggle-panel-btn {
+      position: absolute;
+      top: 24px;
+      left: -44px;
+      background: #23272f;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      color: #fff;
+      width: 44px;
+      height: 44px;
+      cursor: pointer;
+      font-size: 1.5rem;
+      box-shadow: 0 2px 8px #0004;
+      z-index: 3;
+      transition: background 0.2s;
+    }
+    .toggle-panel-btn:hover {
+      background: #2d3748;
+    }
+    .tools {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .tool-btn {
+      flex: 1;
+      padding: 12px 0;
+      border: none;
+      border-radius: 6px;
+      background: #444b5a;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .tool-btn.active {
+      background: #4f8cff;
+      color: #fff;
+    }
+    .settings {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .setting-row label {
+      min-width: 110px;
+    }
+    .brush-size {
+      width: 80px;
+    }
+    @media (max-width: 900px) {
+      .side-panel { width: 220px; padding: 18px 10px 10px 10px; }
+      .toggle-panel-btn { left: -38px; width: 38px; height: 38px; font-size: 1.2rem; }
+    }
+    @media (max-width: 600px) {
+      .main-layout { flex-direction: column; }
+      .side-panel { width: 100vw; position: fixed; right: 0; top: 0; height: 100vh; }
+      .canvas-area { min-height: 60vh; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Стартовая страница -->
+  <div id="start-screen" class="centered">
+    <button class="btn" id="start-btn">Рисовать</button>
+  </div>
+
+  <!-- Модальное окно выбора разрешения -->
+  <div id="modal" class="modal" style="display:none;">
+    <form class="modal-content" id="resolution-form">
+      <h2>Выберите разрешение холста</h2>
+      <div>
+        <label>Ширина (px): <input type="number" id="canvas-width" min="8" value="32" required></label>
+      </div>
+      <div>
+        <label>Высота (px): <input type="number" id="canvas-height" min="8" value="32" required></label>
+      </div>
+      <button class="btn" type="submit">Создать холст</button>
+    </form>
+  </div>
+
+  <!-- Основной интерфейс рисования -->
+  <div id="main-ui" class="main-layout" style="display:none;">
+    <div class="canvas-area">
+      <button class="copy-btn" id="copy-btn">Копировать изображение</button>
+      <canvas id="draw-canvas" width="32" height="32"></canvas>
+    </div>
+    <div class="side-panel" id="side-panel">
+      <button class="toggle-panel-btn" id="toggle-panel-btn">&#9776;</button>
+      <div class="tools">
+        <button class="tool-btn active" id="pencil-btn" title="Карандаш">✏️</button>
+        <button class="tool-btn" id="eraser-btn" title="Ластик">🧹</button>
+      </div>
+      <div class="settings">
+        <div class="setting-row">
+          <label for="color-picker">Цвет:</label>
+          <input type="color" id="color-picker" value="#222222">
+        </div>
+        <div class="setting-row">
+          <label for="brush-size">Размер кисти:</label>
+          <input type="number" id="brush-size" class="brush-size" min="1" value="1">
+        </div>
+        <div class="setting-row">
+          <label for="eraser-size">Размер ластика:</label>
+          <input type="number" id="eraser-size" class="brush-size" min="1" value="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- DOM элементы ---
+    const startScreen = document.getElementById('start-screen');
+    const startBtn = document.getElementById('start-btn');
+    const modal = document.getElementById('modal');
+    const resolutionForm = document.getElementById('resolution-form');
+    const canvasWidthInput = document.getElementById('canvas-width');
+    const canvasHeightInput = document.getElementById('canvas-height');
+    const mainUI = document.getElementById('main-ui');
+    const canvas = document.getElementById('draw-canvas');
+    const ctx = canvas.getContext('2d');
+    const copyBtn = document.getElementById('copy-btn');
+    const sidePanel = document.getElementById('side-panel');
+    const togglePanelBtn = document.getElementById('toggle-panel-btn');
+    const pencilBtn = document.getElementById('pencil-btn');
+    const eraserBtn = document.getElementById('eraser-btn');
+    const colorPicker = document.getElementById('color-picker');
+    const brushSizeInput = document.getElementById('brush-size');
+    const eraserSizeInput = document.getElementById('eraser-size');
+
+    // --- Состояние приложения ---
+    let tool = 'pencil'; // 'pencil' или 'eraser'
+    let brushColor = colorPicker.value;
+    let brushSize = parseInt(brushSizeInput.value, 10);
+    let eraserSize = parseInt(eraserSizeInput.value, 10);
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+    let canvasWidth = 32, canvasHeight = 32;
+
+    // Размеры визуального холста (в пикселях экрана)
+    const DISPLAY_CANVAS_SIZE = 512; // px
+
+    // --- Функции отображения ---
+    function showModal() { modal.style.display = 'flex'; }
+    function hideModal() { modal.style.display = 'none'; }
+    function showMainUI() { mainUI.style.display = 'flex'; }
+    function hideStartScreen() { startScreen.style.display = 'none'; }
+
+    // --- Перерисовка холста ---
+    function renderCanvas() {
+      canvas.style.width = DISPLAY_CANVAS_SIZE + 'px';
+      canvas.style.height = DISPLAY_CANVAS_SIZE + 'px';
+      canvas.style.transform = '';
+      canvas.style.transformOrigin = '';
+    }
+
+    // --- Получение координат пикселя на холсте ---
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      let x, y;
+      if (e.touches) {
+        x = e.touches[0].clientX - rect.left;
+        y = e.touches[0].clientY - rect.top;
+      } else {
+        x = e.clientX - rect.left;
+        y = e.clientY - rect.top;
+      }
+      // Преобразуем координаты в пиксели холста
+      x = Math.floor(x * (canvas.width / rect.width));
+      y = Math.floor(y * (canvas.height / rect.height));
+      return { x, y };
+    }
+
+    // --- Перерисовка при изменении размера холста ---
+    function setupCanvas(width, height) {
+      canvasWidth = width;
+      canvasHeight = height;
+      canvas.width = width;
+      canvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, width, height);
+      renderCanvas();
+    }
+
+    // --- Инструменты ---
+    function setActiveTool(newTool) {
+      tool = newTool;
+      pencilBtn.classList.toggle('active', tool === 'pencil');
+      eraserBtn.classList.toggle('active', tool === 'eraser');
+      canvas.style.cursor = 'crosshair';
+    }
+
+    pencilBtn.onclick = () => setActiveTool('pencil');
+    eraserBtn.onclick = () => setActiveTool('eraser');
+
+    // --- Настройки ---
+    colorPicker.oninput = (e) => {
+      brushColor = e.target.value;
+    };
+    brushSizeInput.oninput = (e) => {
+      brushSize = Math.max(1, parseInt(e.target.value, 10));
+    };
+    eraserSizeInput.oninput = (e) => {
+      eraserSize = Math.max(1, parseInt(e.target.value, 10));
+    };
+
+    // --- Панель инструментов (выдвижная) ---
+    let panelOpen = true;
+    togglePanelBtn.onclick = () => {
+      panelOpen = !panelOpen;
+      sidePanel.classList.toggle('closed', !panelOpen);
+    };
+
+    // --- Рисование ---
+    function canDraw() {
+      return tool === 'pencil' || tool === 'eraser';
+    }
+
+    function drawPixel(x, y) {
+      if (tool === 'pencil') {
+        ctx.fillStyle = brushColor;
+        ctx.fillRect(
+          x - Math.floor(brushSize / 2),
+          y - Math.floor(brushSize / 2),
+          brushSize, brushSize
+        );
+      } else if (tool === 'eraser') {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(
+          x - Math.floor(eraserSize / 2),
+          y - Math.floor(eraserSize / 2),
+          eraserSize, eraserSize
+        );
+      }
+    }
+
+    function handleDraw(e) {
+      if (!drawing || !canDraw()) return;
+      e.preventDefault();
+      const { x, y } = getCanvasPos(e);
+      if (x >= 0 && y >= 0 && x < canvas.width && y < canvas.height) {
+        drawPixel(x, y);
+        lastX = x; lastY = y;
+      }
+    }
+
+    // --- События мыши и сенсорные для всех инструментов ---
+    canvas.addEventListener('mousedown', (e) => {
+      if (canDraw()) {
+        drawing = true;
+        handleDraw(e);
+      }
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if (drawing && canDraw()) {
+        handleDraw(e);
+      }
+    });
+    canvas.addEventListener('mouseup', (e) => {
+      if (canDraw()) {
+        drawing = false;
+      }
+    });
+    canvas.addEventListener('mouseleave', (e) => {
+      if (canDraw()) {
+        drawing = false;
+      }
+    });
+
+    // Сенсорные события
+    canvas.addEventListener('touchstart', (e) => {
+      if (canDraw()) {
+        drawing = true;
+        handleDraw(e);
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => {
+      if (drawing && canDraw()) {
+        handleDraw(e);
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', (e) => {
+      if (canDraw()) {
+        drawing = false;
+      }
+    });
+
+    // --- Копирование изображения ---
+    copyBtn.onclick = async () => {
+      try {
+        canvas.toBlob(async (blob) => {
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            copyBtn.textContent = 'Скопировано!';
+            setTimeout(() => copyBtn.textContent = 'Копировать изображение', 1200);
+          } else {
+            alert('Копирование не поддерживается в этом браузере.');
+          }
+        }, 'image/png');
+      } catch (err) {
+        alert('Ошибка копирования: ' + err);
+      }
+    };
+
+    // --- Изменение размера canvas при изменении окна ---
+    window.addEventListener('resize', () => {
+      renderCanvas();
+    });
+
+    // --- Запуск приложения ---
+    startBtn.onclick = () => {
+      showModal();
+    };
+
+    resolutionForm.onsubmit = (e) => {
+      e.preventDefault();
+      const w = Math.max(8, parseInt(canvasWidthInput.value, 10));
+      const h = Math.max(8, parseInt(canvasHeightInput.value, 10));
+      setupCanvas(w, h);
+      hideModal();
+      hideStartScreen();
+      showMainUI();
+      setActiveTool('pencil');
+    };
+
+    // --- Инициализация по умолчанию ---
+    setupCanvas(32, 32);
+    setActiveTool('pencil');
+  </script>
+</body>
+</html>
